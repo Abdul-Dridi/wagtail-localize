@@ -1,9 +1,10 @@
 from unittest import mock
+from unittest.mock import patch
 
 import polib
 
 from django.conf import settings
-from django.db import OperationalError
+from django.db import OperationalError, transaction
 from django.db.migrations.recorder import MigrationRecorder
 from django.test import TestCase, override_settings
 from django.utils import timezone
@@ -602,14 +603,15 @@ class TestSaveTarget(TestCase):
         self.more_test_content_string = String.objects.get(data="More test content")
 
     def test_save_target(self):
-        self.translation.save_target()
+        with patch.object(transaction, "on_commit", side_effect=lambda func: func()):
+            self.translation.save_target()
 
-        # Should create the page with English content
-        translated_page = self.page.get_translation(self.fr_locale)
-        self.assertEqual(translated_page.test_charfield, "Test content")
-        self.assertEqual(translated_page.test_textfield, "More test content")
+            # Should create the page with English content
+            translated_page = self.page.get_translation(self.fr_locale)
+            self.assertEqual(translated_page.test_charfield, "Test content")
+            self.assertEqual(translated_page.test_textfield, "More test content")
 
-        self.assertTrue(translated_page.live)
+            self.assertTrue(translated_page.live)
 
     def test_save_target_as_draft(self):
         self.translation.save_target(publish=False)
